@@ -5,11 +5,6 @@ using namespace std;
 #include "ag/MoonFast.h"
 #include "ag/Population.h"
 
-void run() {
-
-
-}
-
 int main(void) {
 	MoonFast mf(Ackley::ID);
 
