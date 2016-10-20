@@ -11,14 +11,18 @@ using namespace std;
 #include "MoonFast.h"
 #include "Population.h"
 #include "../auxiliaries/Rand.h"
-#include "../auxiliaries/Configuration.h"
-#include <pthread.h>
+
 #include <algorithm>
 
 MoonFast::MoonFast(const int functionID) {
 	this->functionID = functionID;
 	p = 0;
 	selected = 0;
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_mutex_init(&mutex, NULL);
+	pthread_cond_init(&cond, NULL);
 }
 
 MoonFast::~MoonFast() {
@@ -26,6 +30,9 @@ MoonFast::~MoonFast() {
 		delete p;
 	if(selected)
 		delete selected;
+	pthread_attr_destroy(&attr);
+	pthread_mutex_destroy(&mutex);
+	pthread_cond_destroy(&cond);
 }
 
 void MoonFast::initializePopulation() {
@@ -41,34 +48,44 @@ void *innerCalculateFitness(void *data) {
 }
 
 void MoonFast::calculateFitness(Population *pop) {
-	int rc = 0;
-
-	pthread_t threads[NTHREADS];
-	pthread_attr_t attr;
-	pthread_attr_init(&attr);
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	DataF data;
 	data.p = pop;
-
 	for (int t = 0; t < NTHREADS; t++) {
 		data.t = t;
-		rc = pthread_create(&threads[t], &attr, innerCalculateFitness, (void *)&data);
-		if (rc){
-			cout << "Error:unable to create thread, " << rc << endl;
-			exit(-1);
-		}
+		pthread_create(&threads[t], &attr, innerCalculateFitness, (void *)&data);
 	}
 
-	pthread_attr_destroy(&attr);
-	void *status;
-	for(int t = 0; t < NTHREADS; t++){
-		rc = pthread_join(threads[t], &status);
-		if (rc){
-			cout << "Error:unable to join, " << rc << endl;
-			exit(-1);
-		}
-	}
+	for(int t = 0; t < NTHREADS; t++)
+		pthread_join(threads[t], NULL);
 }
+
+void *innerCalculateFitnessMeanAndStd(void *data) {
+	DataF *d = (DataF *) data;
+	if(d->t == 0) {
+		pthread_cond_wait(d->cond, d->mutex);
+		d->p->calculateFitnessStd();
+	} else {
+		d->p->calculateFitnessMean();
+		pthread_cond_signal(d->cond);
+	}
+	pthread_exit(NULL);
+}
+
+void MoonFast::calculateFitnessMeanAndStd(Population *pop) {
+	DataF data;
+	data.p = pop;
+	data.mutex = &mutex;
+	data.cond = &cond;
+
+	for (int t = 0; t < 2; ++t) {
+		data.t = t;
+		pthread_create(&meanStd_t[t], &attr, innerCalculateFitnessMeanAndStd, (void *)&data);
+	}
+
+	for(int t = 0; t < 2; t++)
+		pthread_join(meanStd_t[t], NULL);
+}
+
 
 Population *MoonFast::parentSelection(Population *pop) {
 	Population *selected = Population::createPopulation(pop->getFunctionID(), true);

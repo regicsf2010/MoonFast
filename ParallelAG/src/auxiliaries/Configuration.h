@@ -9,7 +9,7 @@
 #define AUXILIARIES_CONFIGURATION_H_
 
 /*Genetic algorithm parameters*/
-const int NCHROMOSOMES = 500; // must be even ('cause of crossover)
+const int NCHROMOSOMES = 100; // must be even ('cause of crossover)
 const int NGENERATIONS = 1000;
 const double CROSSOVERRATE = 0.8;
 const double MUTATIONRATE = 0.01;
@@ -21,7 +21,7 @@ const int PRECISION = 3;
 const int WIDTH = PRECISION + 4;
 
 /*Thread parameters*/
-const int NTHREADS = 2;
+const int NTHREADS = 8;
 
 /*Auxiliary classes*/
 class Ackley {
